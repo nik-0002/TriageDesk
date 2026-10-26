@@ -1,67 +1,221 @@
-# TriageDesk: AI Grievance & Service Request Analyzer
+<h1 align="center">
+  🗂️ TriageDesk
+</h1>
 
-Reads complaints, picks out the issue and urgency, groups duplicate or related complaints, and recommends a department and next action. A human reviewer makes every final decision. Synthetic data only.
+<p align="center">
+  <b>AI-powered Grievance & Service Request Analyzer</b><br/>
+  <i>AI recommends — a human decides. Built for transparency, speed, and flexibility.</i>
+</p>
 
-## Features
-- Triage with any of 11 options: Gemma 4 and Llama running locally through Ollama, Claude, OpenAI, Gemini, Grok, DeepSeek, Mistral, OpenRouter, Hugging Face, or offline keyword rules
-- Ensemble mode: every configured model votes, majority wins, and agreement becomes the confidence score
-- Compare models side by side on one complaint
-- Duplicate detection with open source sentence embeddings (all MiniLM L6 v2), falling back to TF IDF
-- ElevenLabs voice read out of each triage result
-- Human review: approve, override or reject, then export to CSV
-- Never breaks: any model error falls back to keyword rules
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/streamlit-UI-FF4B4B?logo=streamlit&logoColor=white" />
+  <img src="https://img.shields.io/badge/providers-11-6e40c9" />
+  <img src="https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/tests-pytest-green?logo=pytest&logoColor=white" />
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey" />
+</p>
 
-## Quick start (local)
+---
+
+## ✨ What is TriageDesk?
+
+TriageDesk is a Streamlit application that reads public complaints or service requests, automatically:
+
+- 🏷️ **Categorises** the issue and assigns it to the right department  
+- 🚨 **Prioritises** urgency: Critical → High → Medium → Low  
+- 🔁 **Detects duplicates** and groups related complaints into clusters  
+- 🤖 **Supports 11 AI providers** — local open-source models or cloud APIs  
+- 🗳️ **Ensemble voting** — run multiple models and let the majority decide  
+- 👨‍⚖️ **Human-in-the-loop** — every AI recommendation requires a human to Approve, Override, or Reject  
+- 📥 **Export** reviewed decisions to CSV
+
+> **All complaint data is synthetic. No real people or places are involved.**
+
+---
+
+## 🖥️ Demo
+
+| Priority Queue | Human Review | Model Comparison |
+|---|---|---|
+| Colour-coded urgency table sorted by priority | Per-complaint approve / override / reject workflow | Run any set of models side-by-side on one complaint |
+
+---
+
+## 🚀 Quick Start (Local)
+
 ```bash
+# 1. Clone
+git clone https://github.com/nik-0002/TriageDesk.git
+cd TriageDesk
+
+# 2. Install dependencies
 pip install -r requirements.txt
-cp .env.example .env        # add whichever keys you have; all are optional
+
+# 3. Configure providers (all optional — keyword rules work offline)
+cp .env.example .env
+# Edit .env and add whichever API keys you have
+
+# 4. Load env vars and run
 set -a; source .env; set +a
 streamlit run app.py
 ```
 
-### Free, fully open source (no API keys)
+### 🆓 Free, Fully Open-Source (No API Keys)
+
+Run with local models through [Ollama](https://ollama.com) — no cloud account needed:
+
 ```bash
-# install Ollama from https://ollama.com, then:
+# Install Ollama from https://ollama.com, then:
 ollama pull gemma4
 ollama pull llama3.2
-streamlit run app.py        # pick "Gemma 4 (Ollama, local)" in the sidebar
+
+streamlit run app.py
+# Select "Gemma 4 (Ollama, local)" or "Llama (Ollama, local)" in the sidebar
 ```
 
-## One command with Docker
+---
+
+## 🐳 One Command with Docker
+
+Starts the app **and** a local Ollama server with Gemma 4 + Llama pulled automatically:
+
 ```bash
-cp .env.example .env
-docker compose up           # starts Ollama, pulls Gemma 4 + Llama, runs the app on :8501
+cp .env.example .env        # add any cloud keys you want (optional)
+docker compose up           # app available at http://localhost:8501
 ```
 
-## Providers
-| Sidebar option | Open source | Needs |
-|---|---|---|
-| Gemma 4 (Ollama, local) | yes | Ollama running, `ollama pull gemma4` |
-| Llama (Ollama, local) | yes | Ollama running, `ollama pull llama3.2` |
-| Hugging Face (Gemma) | yes | `HF_TOKEN` |
-| OpenRouter (Llama) | yes | `OPENROUTER_API_KEY` |
-| DeepSeek | yes | `DEEPSEEK_API_KEY` |
-| Mistral | yes | `MISTRAL_API_KEY` |
-| Claude | no | `ANTHROPIC_API_KEY` |
-| OpenAI | no | `OPENAI_API_KEY` |
-| Gemini | no | `GEMINI_API_KEY` |
-| Grok (xAI) | no | `XAI_API_KEY` |
-| ElevenLabs (voice) | no | `ELEVENLABS_API_KEY` |
+---
 
-Every model ID can be changed with an env var (see `.env.example`). Check each provider's current model list if a default ID has been retired.
+## 🤖 Supported Providers
 
-## Tests
+| Sidebar Option | Open Source | Requires |
+|---|:---:|---|
+| Gemma 4 (Ollama, local) | ✅ | Ollama running · `ollama pull gemma4` |
+| Llama (Ollama, local) | ✅ | Ollama running · `ollama pull llama3.2` |
+| Hugging Face (Gemma) | ✅ | `HF_TOKEN` |
+| OpenRouter (Llama) | ✅ | `OPENROUTER_API_KEY` |
+| DeepSeek | ✅ | `DEEPSEEK_API_KEY` |
+| Mistral | ✅ | `MISTRAL_API_KEY` |
+| Claude (Anthropic) | ❌ | `ANTHROPIC_API_KEY` |
+| OpenAI | ❌ | `OPENAI_API_KEY` |
+| Gemini | ❌ | `GEMINI_API_KEY` |
+| Grok (xAI) | ❌ | `XAI_API_KEY` |
+| ElevenLabs (voice read-aloud) | ❌ | `ELEVENLABS_API_KEY` |
+| Keyword Rules | ✅ | Nothing — always available |
+
+> Every model ID can be overridden with an env var. See `.env.example` for the full list.
+
+---
+
+## 🗳️ Ensemble Mode
+
+Enable **"Ensemble vote"** in the sidebar to query every configured model simultaneously and take a **majority vote** on urgency and department. Agreement among models becomes the confidence score.
+
+```
+Urgency: Critical  (3/3 models agreed → confidence 1.0)
+Source:  vote:claude+gemma+openai
+```
+
+---
+
+## 🔍 Duplicate Detection
+
+TriageDesk clusters similar complaints automatically:
+
+1. **Sentence embeddings** (`all-MiniLM-L6-v2`) when `sentence-transformers` is installed  
+2. **TF-IDF cosine similarity** as a lightweight fallback
+
+Duplicate clusters are shown in a collapsible section below the main queue.
+
+---
+
+## 📁 Project Structure
+
+```
+TriageDesk/
+├── app.py               # Streamlit UI — layout, sidebar, review workflow
+├── analyzer.py          # Triage prompt, keyword rules, ensemble vote, dedup
+├── providers.py         # Unified interface for all AI providers + ElevenLabs
+├── data.py              # 25 synthetic complaints (no real data)
+├── tests/
+│   └── test_analyzer.py # pytest suite with a fake OpenAI-compatible server
+├── Dockerfile           # Production Docker image
+├── docker-compose.yml   # App + Ollama + model pulls in one command
+├── pytest.ini           # Test configuration
+├── requirements.txt     # Python dependencies
+└── .env.example         # Template for API keys and model overrides
+```
+
+---
+
+## 🧪 Tests
+
 ```bash
 pytest
 ```
-A fake OpenAI compatible server tests the real HTTP path for every provider.
 
-## Files
-- `app.py`: Streamlit UI
-- `analyzer.py`: triage prompt, keyword rules, ensemble vote, duplicate detection
-- `providers.py`: every AI provider plus ElevenLabs
-- `data.py`: 25 synthetic complaints
-- `tests/`: pytest suite
+The test suite spins up a **fake OpenAI-compatible HTTP server** to exercise the real HTTP path for every provider without making live API calls:
 
-## Stack
-Python, Streamlit, scikit learn, pandas, sentence transformers, Claude, OpenAI, Gemini, Gemma, Llama, Hugging Face, Ollama, OpenRouter, DeepSeek, Grok, Mistral, ElevenLabs
+- Keyword rule fallback
+- Unconfigured provider fallback
+- JSON parsing with model chatter
+- Every OpenAI-compatible provider (parametrized)
+- Claude path
+- Bad values clamped to valid options
+- Provider errors fall back to rules
+- Ensemble consensus vote
+- Duplicate clustering
+- ElevenLabs TTS
+- `analyze_all` end-to-end
+
+---
+
+## ⚙️ Environment Variables
+
+Copy `.env.example` to `.env` and fill in the keys you want:
+
+```env
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+GEMINI_API_KEY=
+XAI_API_KEY=
+DEEPSEEK_API_KEY=
+MISTRAL_API_KEY=
+OPENROUTER_API_KEY=
+HF_TOKEN=
+ELEVENLABS_API_KEY=
+
+# Optional model overrides
+CLAUDE_MODEL=claude-haiku-5-5
+OPENAI_MODEL=gpt-4o-mini
+GEMINI_MODEL=gemini-2.5-flash
+GEMMA_MODEL=gemma4
+LLAMA_MODEL=llama3.2
+OLLAMA_URL=http://localhost:11434
+```
+
+---
+
+## 🏗️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| UI | Streamlit |
+| AI (cloud) | Claude, OpenAI, Gemini, Grok, DeepSeek, Mistral, Hugging Face, OpenRouter |
+| AI (local) | Gemma 4, Llama via Ollama |
+| Duplicate detection | sentence-transformers · scikit-learn (TF-IDF) |
+| Data | pandas |
+| Voice | ElevenLabs |
+| Tests | pytest |
+| Containers | Docker · Docker Compose |
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">Made with ❤️ · <i>AI recommends, a human decides.</i></p>
