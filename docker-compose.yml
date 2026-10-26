@@ -1,0 +1,23 @@
+# One command: app + local open-source models (Gemma 4, Llama) via Ollama.
+#   docker compose up
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes: [ollama:/root/.ollama]
+    ports: ["11434:11434"]
+
+  pull-models:
+    image: ollama/ollama:latest
+    depends_on: [ollama]
+    environment: [OLLAMA_HOST=ollama:11434]
+    entrypoint: ["sh", "-c", "sleep 5 && ollama pull ${GEMMA_MODEL:-gemma4} && ollama pull ${LLAMA_MODEL:-llama3.2}"]
+
+  app:
+    build: .
+    depends_on: [ollama]
+    ports: ["8501:8501"]
+    env_file: [.env]
+    environment: [OLLAMA_URL=http://ollama:11434]
+
+volumes:
+  ollama:

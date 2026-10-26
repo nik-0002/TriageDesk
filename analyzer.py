@@ -1,9 +1,12 @@
-import json
 import os
 import re
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+import providers
 
 URGENCIES = ["Critical", "High", "Medium", "Low"]
 DEPARTMENTS = [
@@ -61,35 +64,69 @@ def _fallback(text):
     }
 
 
-def classify(text):
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+def classify(text, provider="claude"):
+    """Ask one provider to triage a complaint. Falls back to keyword rules on any failure."""
+    if provider == "rules" or not providers.available(provider):
         return _fallback(text)
     try:
-        import anthropic
-        msg = anthropic.Anthropic().messages.create(
-            model="claude-haiku-5-5",
-            max_tokens=300,
-            messages=[{"role": "user", "content": PROMPT.format(
-                urg=URGENCIES, dept=DEPARTMENTS, text=text)}],
-        )
-        raw = msg.content[0].text
-        out = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
+        out = providers.parse_json(providers.complete(
+            provider, PROMPT.format(urg=URGENCIES, dept=DEPARTMENTS, text=text)))
         if out.get("urgency") not in URGENCIES:
             out["urgency"] = "Medium"
         if out.get("department") not in DEPARTMENTS:
             out["department"] = "General"
-        out["source"] = "claude"
+        out["source"] = provider
         return out
+    except Exception as e:
+        r = _fallback(text)
+        r["reason"] = f"{provider} failed ({type(e).__name__}), used keyword rules"
+        return r
+
+
+def consensus(text, provider_list):
+    """Run several providers and take a majority vote on urgency and department."""
+    votes = [classify(text, p) for p in provider_list]
+    pick = lambda field: Counter(v[field] for v in votes).most_common(1)[0][0]
+    urg, dept = pick("urgency"), pick("department")
+    best = next(v for v in votes if v["urgency"] == urg and v["department"] == dept) \
+        if any(v["urgency"] == urg and v["department"] == dept for v in votes) else votes[0]
+    agree = sum(v["urgency"] == urg for v in votes)
+    return {**best, "urgency": urg, "department": dept,
+            "confidence": round(agree / len(votes), 2),
+            "source": "vote:" + "+".join(v["source"] for v in votes),
+            "votes": votes}
+
+
+_EMBEDDER = None
+
+
+def _embed_similarity(texts):
+    """Open-source sentence embeddings (all-MiniLM-L6-v2). Returns None if unavailable."""
+    global _EMBEDDER
+    try:
+        if _EMBEDDER is None:
+            from sentence_transformers import SentenceTransformer
+            _EMBEDDER = SentenceTransformer(os.environ.get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2"))
+        return cosine_similarity(_EMBEDDER.encode(texts))
     except Exception:
-        return _fallback(text)
+        _EMBEDDER = False
+        return None
 
 
-def find_duplicates(texts, threshold=0.2):
-    """Union-find over TF-IDF cosine pairs above threshold. Returns cluster id per text (-1 = unique)."""
+def find_duplicates(texts, threshold=0.2, embed_threshold=0.6, use_embeddings=True):
+    """Union-find over similar pairs. Returns (cluster id per text, method); -1 = unique.
+
+    Uses sentence embeddings when available, otherwise TF-IDF cosine similarity.
+    """
     if len(texts) < 2:
-        return [-1] * len(texts)
-    norm = [re.sub(r"wi-?fi", "wifi", t.lower()) for t in texts]
-    sim = cosine_similarity(TfidfVectorizer(stop_words="english").fit_transform(norm))
+        return [-1] * len(texts), "none"
+    sim = _embed_similarity(texts) if use_embeddings and _EMBEDDER is not False else None
+    if sim is not None:
+        method, threshold = "embeddings", embed_threshold
+    else:
+        method = "tfidf"
+        norm = [re.sub(r"wi-?fi", "wifi", t.lower()) for t in texts]
+        sim = cosine_similarity(TfidfVectorizer(stop_words="english").fit_transform(norm))
     parent = list(range(len(texts)))
 
     def find(i):
@@ -110,14 +147,23 @@ def find_duplicates(texts, threshold=0.2):
             out.append(-1)
         else:
             out.append(ids.setdefault(r, len(ids) + 1))
-    return out
+    return out, method
 
 
-def analyze_all(texts):
+def analyze_all(texts, provider="claude", vote_with=None):
+    """Classify every complaint and attach duplicate clusters.
+
+    vote_with: optional list of providers to run as a majority-vote ensemble.
+    """
+    clusters, method = find_duplicates(texts)
     rows = []
-    clusters = find_duplicates(texts)
-    for i, (t, c) in enumerate(zip(texts, clusters)):
-        r = classify(t)
-        r.update(id=i + 1, text=t, cluster=c)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        if vote_with:
+            results = list(pool.map(lambda t: consensus(t, vote_with), texts))
+        else:
+            results = list(pool.map(lambda t: classify(t, provider), texts))
+    for i, (t, c, r) in enumerate(zip(texts, clusters, results)):
+        r.pop("votes", None)
+        r.update(id=i + 1, text=t, cluster=c, dedup=method)
         rows.append(r)
     return rows

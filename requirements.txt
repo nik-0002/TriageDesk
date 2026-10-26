@@ -2,3 +2,6 @@ streamlit
 anthropic
 scikit-learn
 pandas
+requests
+sentence-transformers
+pytest
